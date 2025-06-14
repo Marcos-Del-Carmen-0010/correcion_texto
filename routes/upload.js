@@ -1,35 +1,54 @@
+const fs = require('fs');
+const PDFDocument = require('pdfkit');
+const { Document, Packer, Paragraph } = require('docx');
 const express = require('express');
 const multer = require('multer');
-const fs = require('fs');
-const path = require('path');
-const PDFDocument = require('pdfkit');
-const { Document, Packer, Paragraph, TextRun } = require('docx');
-const axios = require('axios');
+const pdfParse = require('pdf-parse');
 
+const path = require('path');
+const mammoth = require('mammoth');
+const axios = require('axios');
 const router = express.Router();
 const upload = multer({ dest: path.join(__dirname, '../uploads') });
 
-router.post('/', upload.single('archivo'), (req, res) => {
+router.post('/', upload.single('archivo'), async (req, res) => {
   const archivo = req.file;
   if (!archivo) return res.send('No se subió ningún archivo');
-  
+
+  const ext = path.extname(archivo.originalname).toLowerCase();
   const rutaBase = path.join(__dirname, '../uploads', archivo.filename);
   const rutaTXT = `${rutaBase}-corregido.txt`;
   const rutaPDF = `${rutaBase}-corregido.pdf`;
   const rutaDOCX = `${rutaBase}-corregido.docx`;
 
-  fs.readFile(archivo.path, 'utf8', async (err, data) => {
-    if (err) return res.send('Error leyendo el archivo');
+  let textoExtraido = '';
 
-    const textoCorregido = await corregirTexto(data);
+  try {
+    if (ext === '.txt') {
+      textoExtraido = fs.readFileSync(archivo.path, 'utf8');
+    } else if (ext === '.docx') {
+      const result = await mammoth.extractRawText({ path: archivo.path });
+      textoExtraido = result.value;
+    } else if (ext === '.pdf') {
+      const dataBuffer = fs.readFileSync(archivo.path);
+      const pdfData = await pdfParse(dataBuffer);
+      textoExtraido = pdfData.text;
+    } else {
+      return res.status(400).send('Formato no compatible');
+    }
 
-    fs.writeFileSync(rutaTXT, textoCorregido);
+    const textoCorregido = await corregirTexto(textoExtraido);
 
-    const doc = new PDFDocument();
-    doc.pipe(fs.createWriteStream(rutaPDF));
-    doc.fontSize(12).text(textoCorregido);
-    doc.end();
+    // Guardar archivo .txt
+    fs.writeFileSync(rutaTXT, textoCorregido, 'utf8');
 
+    // Guardar archivo PDF
+    const docPDF = new PDFDocument();
+    docPDF.pipe(fs.createWriteStream(rutaPDF));
+    docPDF.fontSize(12).text(textoCorregido);
+    docPDF.end();
+
+    // Guardar archivo DOCX
     const docx = new Document({
       sections: [{
         children: [new Paragraph(textoCorregido)],
@@ -39,34 +58,46 @@ router.post('/', upload.single('archivo'), (req, res) => {
     fs.writeFileSync(rutaDOCX, buffer);
 
     res.render('results', { filename: archivo.filename });
-  });
+
+  } catch (error) {
+    console.error('Error procesando archivo:', error);
+    res.status(500).send('Error al procesar el archivo');
+  }
 });
 
+function limpiarTextoConEspacios(texto) {
+  return texto.replace(/[{};:]/g, '');
+}
 
 async function corregirTexto(texto) {
+  const textoLimpio = limpiarTextoConEspacios(texto);
   try {
     const response = await axios.post('https://api.languagetool.org/v2/check', null, {
       params: {
-        text: texto,
+        text: textoLimpio,
         language: 'es',
+      },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
       }
     });
 
     const matches = response.data.matches;
-    let textoCorregido = texto;
+    let textoCorregido = textoLimpio;
 
     matches.forEach(match => {
-      if (match.replacements && match.replacements.length > 0) {
-        // Reemplazamos la palabra incorrecta con la primera sugerencia
-        textoCorregido = textoCorregido.replace(match.context.text.substr(match.context.offset, match.context.length), match.replacements[0].value);
+      if (match.replacements?.length > 0) {
+        const original = match.context.text.substr(match.context.offset, match.context.length);
+        const replacement = match.replacements[0].value;
+        textoCorregido = textoCorregido.replace(original, replacement);
       }
     });
-
-    return textoCorregido;
+    
+    return textoCorregido = textoCorregido.replace(/;/g, ',');
 
   } catch (error) {
-    console.error('Error corrigiendo texto:', error);
-    return texto; // retorna el original si falla
+    console.error('Error corrigiendo texto:', error.response?.data || error.message);
+    return texto;
   }
 }
 
