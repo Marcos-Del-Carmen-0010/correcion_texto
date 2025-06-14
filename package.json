@@ -1,0 +1,24 @@
+{
+  "name": "subir_archivo",
+  "version": "1.0.0",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.10.0",
+    "docx": "^9.5.0",
+    "ejs": "^3.1.10",
+    "express": "^5.1.0",
+    "lodash": "^4.17.21",
+    "multer": "^2.0.1",
+    "nodemon": "^3.1.10",
+    "path": "^0.12.7",
+    "pdfkit": "^0.17.1"
+  }
+}

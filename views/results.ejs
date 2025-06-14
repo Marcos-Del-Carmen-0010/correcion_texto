@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archivo Corregido</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="cont-files">
+        <div class="cont cont-right">
+            <div class="icon">
+                <img src="imgs/descargar-archivo(1).png" alt="">
+            </div>
+            <p>SELCCIONA UN TIPO DE ARCHIVO A DESCARGAR</p>
+            <div class="cont-buttons">
+                <a class="w-100" href="/uploads/<%= filename %>-corregido.txt" download> <button class="w-100">TXT</button> </a>
+                <a class="w-100" href="/uploads/<%= filename %>-corregido.pdf" download> <button class="w-100">PDF</button> </a>
+                <a class="w-100" href="/uploads/<%= filename %>-corregido.docx" download> <button class="w-100">WORD</button> </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
